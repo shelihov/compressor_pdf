@@ -45,7 +45,7 @@ def can_compress(user_id):
     if user is None:
         add_user(user_id)
         user = get_user(user_id)
-        
+
     if user[1] == 1:
         return True
     elif user[2] > 0:
@@ -54,3 +54,37 @@ def can_compress(user_id):
         return True
     else:
         return False
+
+def use_compression(user_id):
+    user = get_user(user_id)
+
+    connection = sqlite3.connect("users.db")
+    cursor = connection.cursor()
+
+    if user[1] == 1:
+        pass
+    elif user[2] > 0:
+        cursor.execute('''
+            UPDATE users
+            SET free_compressions = free_compressions - 1
+            WHERE user_id = ?
+            ''', (user_id,))
+    elif user[3] > 0:
+        cursor.execute('''
+            UPDATE users
+            SET paid_compressions = paid_compressions - 1
+            WHERE user_id = ?
+            ''', (user_id,))
+    else:
+        connection.close()
+        return False
+    
+    cursor.execute('''
+        UPDATE users
+        SET total_compressions = total_compressions + 1
+        WHERE user_id = ?
+        ''', (user_id,))
+    
+    connection.commit()
+    connection.close()
+    return True
