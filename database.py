@@ -56,35 +56,77 @@ def can_compress(user_id):
         return False
 
 def use_compression(user_id):
-    user = get_user(user_id)
+    try:
+        connection = sqlite3.connect("users.db")
+        cursor = connection.cursor()
+
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute('''
+            SELECT * FROM users
+            WHERE user_id = ?
+        ''', (user_id,))
+
+        user = cursor.fetchone()
+        if user is None:
+            connection.rollback()
+            connection.close()
+            return False
+
+        if user[1] == 1:
+            pass
+        elif user[2] > 0:
+            cursor.execute('''
+                UPDATE users
+                SET free_compressions = free_compressions - 1
+                WHERE user_id = ?
+                ''', (user_id,))
+        elif user[3] > 0:
+            cursor.execute('''
+                UPDATE users
+                SET paid_compressions = paid_compressions - 1
+                WHERE user_id = ?
+                ''', (user_id,))
+        else:
+            connection.close()
+            return False
+        
+        cursor.execute('''
+            UPDATE users
+            SET total_compressions = total_compressions + 1
+            WHERE user_id = ?
+            ''', (user_id,))
+        connection.commit()
+        return True
+        
+    except sqlite3.Error as error:
+        connection.rollback()
+        print("Ошибка SQLite:", error)
+        return False
+    finally:
+        connection.close()
+
+def grant_free_access(user_id):
+    add_user(user_id)
 
     connection = sqlite3.connect("users.db")
     cursor = connection.cursor()
 
-    if user[1] == 1:
-        pass
-    elif user[2] > 0:
-        cursor.execute('''
-            UPDATE users
-            SET free_compressions = free_compressions - 1
-            WHERE user_id = ?
-            ''', (user_id,))
-    elif user[3] > 0:
-        cursor.execute('''
-            UPDATE users
-            SET paid_compressions = paid_compressions - 1
-            WHERE user_id = ?
-            ''', (user_id,))
-    else:
-        connection.close()
-        return False
+    cursor.execute('''
+        UPDATE users
+        SET is_free = 1
+        WHERE user_id = ?
+    ''', (user_id,))
+    connection.commit()
+    connection.close()
+
+def revoke_free_access(user_id):    
+    connection = sqlite3.connect("users.db")
+    cursor = connection.cursor()
     
     cursor.execute('''
         UPDATE users
-        SET total_compressions = total_compressions + 1
+        SET is_free = 0
         WHERE user_id = ?
-        ''', (user_id,))
-    
+    ''', (user_id,))
     connection.commit()
     connection.close()
-    return True
